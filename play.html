@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Play — Pixel Bat</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--turf:#0d1a12;--turf2:#132417;--chalk:#e8e4d9;--dim:#7d8c7f;
+        --lamp:#ffb547;--clay:#a8563a;--line:#25392a;--sky:#6fa8dc}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--turf);color:var(--chalk);font-family:'Barlow',system-ui,sans-serif;
+       -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+       min-height:100vh;padding:20px 18px calc(24px + env(safe-area-inset-bottom))}
+  h1{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:600;line-height:1}
+  .sub{color:var(--dim);font-size:14px;margin-top:5px;max-width:34ch}
+  input{width:100%;margin-top:18px;padding:16px;background:var(--turf2);border:1px solid var(--line);
+        color:var(--lamp);border-radius:3px;font-family:'Barlow Condensed',sans-serif;
+        font-size:44px;font-weight:600;text-align:center;letter-spacing:.18em;text-transform:uppercase}
+  input::placeholder{color:var(--line)}
+  button{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;background:var(--lamp);
+         color:#1a1206;border:0;border-radius:3px;padding:16px 22px;width:100%;margin-top:12px;cursor:pointer}
+  button:disabled{opacity:.35}
+  button.ghost{background:none;color:var(--dim);border:1px solid var(--line);font-size:16px;padding:11px}
+  .hide{display:none}
+  .roles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .roles button{margin:0}
+  .roles button.off{background:none;color:var(--dim);border:1px solid var(--line)}
+
+  #status{margin-top:16px;padding:11px 13px;background:var(--turf2);border:1px solid var(--line);
+          font-size:13px;color:var(--dim);display:flex;justify-content:space-between;align-items:center}
+  #status b{color:var(--sky);font-family:'Barlow Condensed',sans-serif;font-size:17px}
+
+  #pad{margin-top:16px;border:2px solid var(--line);border-radius:6px;background:var(--turf2);
+       height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+       font-family:'Barlow Condensed',sans-serif;font-size:34px;color:var(--dim);text-align:center;padding:16px}
+  #pad.live{border-color:var(--lamp);color:var(--lamp)}
+  #pad.swung{border-color:var(--sky);color:var(--sky)}
+  #pad small{display:block;font-family:'Barlow',sans-serif;font-size:14px;color:var(--dim);margin-top:9px}
+
+  #result{margin-top:12px;padding:15px 12px;text-align:center;background:var(--turf2);
+          border:1px solid var(--line);font-family:'Barlow Condensed',sans-serif;
+          font-size:26px;color:var(--dim);min-height:78px}
+  #result small{display:block;font-family:'Barlow',sans-serif;font-size:13px;color:var(--dim);margin-top:5px}
+  .guide{margin-top:12px;font-size:13px;color:var(--dim);line-height:1.75}
+  .guide b{color:var(--chalk);font-weight:500}
+</style>
+</head>
+<body>
+
+<div id="v-join">
+  <h1>Pixel Bat</h1>
+  <p class="sub">Enter the four letters shown on the big screen.</p>
+  <input id="code" placeholder="CODE" maxlength="4" autocomplete="off" autocapitalize="characters">
+  <div class="roles">
+    <button id="r-bat">Bat</button>
+    <button id="r-pit" class="off">Pitch</button>
+  </div>
+  <button id="join">Join the game</button>
+  <p class="sub" id="err" style="color:var(--clay)"></p>
+</div>
+
+<div id="v-play" class="hide">
+  <h1 id="who">Batter</h1>
+  <div id="status"><span id="link">connecting…</span><b id="lat">—</b></div>
+
+  <div class="guide hide" id="pguide">
+    <b>Flat wrist</b> — four-seam<br>
+    <b>Snap over the top</b> — curveball<br>
+    <b>Roll it sideways</b> — slider<br>
+    <b>Easy motion</b> — changeup<br>
+    Where you aim at release is where it goes.
+  </div>
+
+  <div id="pad">Watch the big screen<small>Swing when the ball reaches the plate</small></div>
+  <div class="guide hide" id="bguide">
+    Swing <b>through</b> the ball, don't flick your wrist — the harder the phone
+    moves, the harder it's hit. Lay off anything out of the zone; you can't
+    drive it.
+  </div>
+  <div id="result">—</div>
+  <button class="ghost" id="leave">Leave</button>
+</div>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i);};
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+
+var role='batter',peer=null,conn=null;
+var offset=0,rtt=0,synced=false,armed=true;
+var gv={x:0,y:-9.81,z:0},hist=[],lastT=0,burst=null;
+var ARM=3.2,MING=5.5;
+
+function elev(){var m=Math.hypot(gv.x,gv.y,gv.z)||1;
+  return Math.acos(clamp(gv.y/m,-1,1))*57.2958;}
+function lat(){var m=Math.hypot(gv.x,gv.y,gv.z)||1;
+  return Math.asin(clamp(gv.x/m,-1,1))*57.2958;}
+function ago(ms){
+  var want=performance.now()-ms;
+  for(var i=hist.length-1;i>=0;i--)if(hist[i].t<=want)return hist[i];
+  return hist[0]||{e:elev(),l:lat()};
+}
+
+function onMotion(e){
+  var now=performance.now();
+  var dt=e.interval?e.interval:Math.min((now-lastT)/1000,0.05);lastT=now;
+
+  var ag=e.accelerationIncludingGravity;
+  if(ag&&ag.x!==null){
+    gv.x=gv.x*0.86+ag.x*0.14;gv.y=gv.y*0.86+ag.y*0.14;gv.z=gv.z*0.86+ag.z*0.14;
+  }
+  hist.push({t:now,e:elev(),l:lat()});
+  while(hist.length&&now-hist[0].t>1200)hist.shift();
+
+  var a=e.acceleration,lin;
+  if(a&&a.x!==null)lin=Math.hypot(a.x,a.y,a.z)/9.81;
+  else if(ag&&ag.x!==null)lin=Math.abs(Math.hypot(ag.x,ag.y,ag.z)/9.81-1);
+  else lin=0;
+
+  var r=e.rotationRate||{alpha:0,beta:0,gamma:0};
+  var spin=Math.max(Math.abs(r.alpha||0),Math.abs(r.beta||0),Math.abs(r.gamma||0));
+
+  /* +1 means the barrel is travelling straight up, -1 straight down */
+  var vup=0;
+  if(a&&a.x!==null){
+    var gm=Math.hypot(gv.x,gv.y,gv.z)||1;
+    vup=-((a.x*gv.x+a.y*gv.y+a.z*gv.z)/gm);
+  }
+
+  if(burst){
+    burst.tb+=(r.beta||0)*dt;burst.tg+=(r.gamma||0)*dt;
+    burst.vu+=vup*dt; burst.vt+=Math.abs(lin*9.81)*dt;
+    if(lin>burst.g){burst.g=lin;burst.t=now;burst.dec=0;
+      burst.spin=Math.max(burst.spin,spin);burst.ab=burst.tb;burst.ag=burst.tg;}
+    else if(++burst.dec>=4){ if(burst.g>=MING)fire(burst); burst=null; }
+  } else if(lin>ARM){
+    var pre=ago(140);
+    burst={g:lin,t:now,dec:0,spin:spin,e:pre.e,l:pre.l,tb:0,tg:0,ab:0,ag:0,vu:0,vt:0};
+  }
+}
+
+$('r-bat').addEventListener('click',function(){role='batter';$('r-bat').className='';$('r-pit').className='off';});
+$('r-pit').addEventListener('click',function(){role='pitcher';$('r-pit').className='';$('r-bat').className='off';});
+$('join').addEventListener('click',function(){
+  var c=$('code').value.trim().toUpperCase();
+  if(c.length!==4){$('err').textContent='Four letters, from the big screen.';return;}
+  $('join').disabled=true;$('err').textContent='';
+  askSensors(function(ok){
+    if(!ok){$('err').textContent='Motion access is required. Reload and allow it.';$('join').disabled=false;return;}
+    connect(c);
+  });
+});
+function askSensors(cb){
+  if(window.DeviceMotionEvent&&typeof DeviceMotionEvent.requestPermission==='function'){
+    DeviceMotionEvent.requestPermission().then(function(r){cb(r==='granted');}).catch(function(){cb(false);});
+  } else cb(!!window.DeviceMotionEvent);
+}
+function connect(c){
+  peer=new Peer({debug:1});
+  peer.on('open',function(){
+    conn=peer.connect('pixelbat-'+c,{reliable:false});
+    conn.on('open',function(){
+      window.addEventListener('devicemotion',onMotion);
+      conn.send({k:'join',role:role});
+      conn.send({k:'ready'});
+      clockSync();showPlay();
+    });
+    conn.on('data',onData);
+    conn.on('close',function(){$('link').textContent='disconnected';});
+    conn.on('error',function(){$('err').textContent='Could not reach that game.';$('join').disabled=false;});
+  });
+  peer.on('error',function(){$('err').textContent='No game found with that code.';$('join').disabled=false;});
+}
+function showPlay(){
+  $('v-join').classList.add('hide');
+  $('v-play').classList.remove('hide');
+  $('who').textContent=role==='pitcher'?'Pitcher':'Batter';
+  if(role==='pitcher'){
+    $('pguide').classList.remove('hide');$('bguide').classList.add('hide');
+    $('pad').innerHTML='Wind up and throw<small>Your wrist picks the pitch</small>';
+  } else {
+    $('bguide').classList.remove('hide');$('pguide').classList.add('hide');
+  }
+}
+
+var samples=[],pending={},seq=0;
+function clockSync(){
+  samples=[];
+  for(var i=0;i<12;i++)(function(n){
+    setTimeout(function(){var id=++seq;pending[id]=performance.now();conn.send({k:'ping',c:id});},n*90);
+  })(i);
+  setTimeout(function(){
+    if(!samples.length)return;
+    samples.sort(function(a,b){return a.rtt-b.rtt;});
+    var keep=samples.slice(0,3);
+    offset=keep.reduce(function(a,s){return a+s.off;},0)/keep.length;
+    rtt=keep[0].rtt;synced=true;
+    $('link').textContent=role==='pitcher'?'on the mound':'in the box';
+    $('lat').textContent=Math.round(rtt)+'ms';
+  },1500);
+}
+function onData(m){
+  if(m.k==='pong'){
+    var t0=pending[m.c];if(!t0)return;
+    var r=performance.now()-t0;
+    samples.push({rtt:r,off:m.host-(t0+r/2)});delete pending[m.c];return;
+  }
+  if(m.k==='seat'){
+    role=m.role;showPlay();return;
+  }
+  if(m.k==='full'){$('link').textContent='game is full';return;}
+  if(m.k==='live'||m.k==='yourturn'){
+    armed=true;$('pad').className='live';
+    $('pad').innerHTML=role==='pitcher'?'Deal<small>Wrist picks the pitch</small>'
+                                       :'NOW<small>Swing through it</small>';
+    return;
+  }
+  if(m.k==='result'){
+    $('result').innerHTML=m.t+'<small>'+(m.n||'')+'</small>';
+    $('pad').className='';
+    $('pad').innerHTML=role==='pitcher'?'Wind up and throw<small>Your wrist picks the pitch</small>'
+                                       :'Watch the big screen<small>Swing when the ball reaches the plate</small>';
+    return;
+  }
+}
+
+function fire(b){
+  if(!synced||!conn||!conn.open||!armed)return;
+  armed=false;
+  if(navigator.vibrate)navigator.vibrate(14);
+  $('pad').className='swung';
+  if(role==='pitcher'){
+    var over=b.ab,side=b.ag,type='fastball';
+    if(over<-30)type='curve';
+    else if(Math.abs(side)>34)type='slider';
+    else if(b.g<9.5)type='change';
+    var px=clamp(b.l/32*1.5,-1.5,1.5);
+    var pz=clamp(0.9+(b.e-70)/55*3.0,0.9,4.1);
+    $('pad').innerHTML=NAMES[type]+'<small>'+Math.round(b.g)+'g · '+
+      Math.round(over)+'° over, '+Math.round(side)+'° side</small>';
+    conn.send({k:'throw',type:type,px:px,pz:pz});
+  } else {
+    var up=clamp(b.vt>0.5?b.vu/b.vt:0,-1,1);
+    $('pad').innerHTML=Math.round(b.g)+' g<small>'+
+      (up>0.15?'swung up':up<-0.15?'swung down':'level swing')+
+      ' · '+(up>0?'+':'')+up.toFixed(2)+'</small>';
+    conn.send({k:'swing',t:b.t+offset,g:Math.round(b.g*10)/10,
+               up:Math.round(up*100)/100,spin:Math.round(b.spin)});
+  }
+  conn.send({k:'rtt',ms:rtt,off:offset});
+}
+var NAMES={fastball:'Four-seam',curve:'Curveball',slider:'Slider',change:'Changeup'};
+
+$('leave').addEventListener('click',function(){location.reload();});
+})();
+</script>
+</body>
+</html>
