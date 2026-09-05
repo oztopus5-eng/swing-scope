@@ -397,14 +397,14 @@ function skyTex(){
 function fieldTex(){
   var S=1024,c=document.createElement('canvas');c.width=c.height=S;
   var g=c.getContext('2d');
-  g.fillStyle='#1f5128';g.fillRect(0,0,S,S);
+  g.fillStyle='#5d9a1d';g.fillRect(0,0,S,S);
   for(var k=0;k<S;k+=26){
-    g.fillStyle=((k/26)|0)%2?'#255e2e':'#1c4823';
+    g.fillStyle=((k/26)|0)%2?'#69a924':'#528c17';
     g.fillRect(0,k,S,26);
   }
   g.globalAlpha=0.06;
   for(var d=0;d<5000;d++){
-    g.fillStyle=Math.random()<0.5?'#0f2a15':'#3a7a44';
+    g.fillStyle=Math.random()<0.5?'#41750f':'#7cb833';
     g.fillRect(Math.random()*S,Math.random()*S,2,2);
   }
   g.globalAlpha=1;
@@ -424,7 +424,7 @@ function flat(shape,color,y){
 function pt(sh,x,z,first){ first?sh.moveTo(x,-z):sh.lineTo(x,-z); }
 
 function buildInfield(){
-  var DIRT=0x9c6b3f,GRASS=0x245c2d,MOUND=0x8a5c36;
+  var DIRT=0xd2603a,GRASS=0x5d9a1d,MOUND=0xc2542f;
 
   /* skinned arc: 95 ft off the mound, which works out to 156 ft from home
      behind second and 128 down the lines */
@@ -478,7 +478,7 @@ function buildTrack(){
     var q2=xz(fence(Math.max(-45,Math.min(45,a)))-16,a);
     pt(sh,q2[0],q2[1]);
   }
-  flat(sh,0x8a5f3a,0.03);
+  flat(sh,0xc4562f,0.03);
 }
 
 /* two mirrored seam curves with stitches, the way a ball unwraps */
@@ -515,15 +515,15 @@ function seatTex(rows,tone){
   g.fillStyle=tone;g.fillRect(0,0,W,H);
   var rh=H/rows;
   for(var r=0;r<rows;r++){
-    g.fillStyle=r%2?'#1b2f47':'#17283c';
+    g.fillStyle=r%2?'#66737e':'#5c6974';
     g.fillRect(0,r*rh+rh*0.18,W,rh*0.64);
     for(var x=0;x<W;x+=7){
-      g.fillStyle=Math.random()<0.42
-        ? ['#d9d3c6','#c0705a','#7f95b5','#5f7a55','#caa96b'][(Math.random()*5)|0]
-        : '#101c2b';
+      g.fillStyle=Math.random()<0.55
+        ? ['#e4ded1','#c9765d','#8fa4c2','#6d8a62','#d3b477','#b7c2cc'][(Math.random()*6)|0]
+        : '#4a5661';
       g.fillRect(x+1,r*rh+rh*0.26,4.6,rh*0.46);
     }
-    g.fillStyle='#0d1723';g.fillRect(0,r*rh,W,rh*0.16);
+    g.fillStyle='#4a5661';g.fillRect(0,r*rh,W,rh*0.16);
   }
   var t=new THREE.CanvasTexture(c);
   t.wrapS=THREE.RepeatWrapping;t.repeat.set(46,1);t.anisotropy=8;
@@ -538,21 +538,21 @@ function buildStadium(){
     m.position.set(0,y+h/2,CZ);m.receiveShadow=true;scene.add(m);
     return m;
   }
-  deck(252,318,34,4,11,'#16283c');
-  deck(330,404,44,44,14,'#132234');
+  deck(252,318,34,4,11,'#7d8a95');
+  deck(330,404,44,44,14,'#6f7d89');
 
   /* the concrete lip between decks, and the roof band above */
   [[318,330,40,38],[404,428,16,88]].forEach(function(v){
     var m=new THREE.Mesh(new THREE.CylinderGeometry(v[1],v[0],v[2],80,1,true),
-      new THREE.MeshLambertMaterial({color:0x2b3644,side:THREE.DoubleSide}));
+      new THREE.MeshLambertMaterial({color:0x8d9aa4,side:THREE.DoubleSide}));
     m.position.set(0,v[3]+v[2]/2,CZ);scene.add(m);
   });
-  var roof=new THREE.Mesh(new THREE.CylinderGeometry(432,392,3,80,1,true),
-    new THREE.MeshLambertMaterial({color:0x39485a,side:THREE.DoubleSide}));
+  var roof=new THREE.Mesh(new THREE.CylinderGeometry(452,386,4,80,1,true),
+    new THREE.MeshLambertMaterial({color:0xa8b4bd,side:THREE.DoubleSide}));
   roof.position.set(0,106,CZ);scene.add(roof);
 
   /* light towers */
-  var poleM=new THREE.MeshLambertMaterial({color:0x2a3340});
+  var poleM=new THREE.MeshLambertMaterial({color:0x7c8892});
   var lampM=new THREE.MeshBasicMaterial({color:0xfff4d0});
   [-118,-64,-20,20,64,118].forEach(function(deg){
     var r=418,a=deg*Math.PI/180;
@@ -562,6 +562,49 @@ function buildStadium(){
     var bank=new THREE.Mesh(new THREE.BoxGeometry(34,15,3),lampM);
     bank.position.set(px,150,pz);bank.lookAt(0,40,40);scene.add(bank);
   });
+
+  /* scoreboard out in dead centre, like the reference */
+  (function(){
+    var bx=0,bz=fence(0)+42;
+    var frame=new THREE.Mesh(new THREE.BoxGeometry(96,54,5),
+      new THREE.MeshLambertMaterial({color:0x39434c}));
+    frame.position.set(bx,58,bz);scene.add(frame);
+    var C=512,cv2=document.createElement('canvas');cv2.width=C;cv2.height=C*0.56;
+    var g2=cv2.getContext('2d');
+    g2.fillStyle='#0d1418';g2.fillRect(0,0,C,C*0.56);
+    g2.fillStyle='#141d23';
+    for(var yy=0;yy<C*0.56;yy+=6)g2.fillRect(0,yy,C,3);
+    g2.fillStyle='#ffb547';
+    g2.font='bold 74px Barlow Condensed, sans-serif';g2.textAlign='center';
+    g2.fillText('PIXEL BAT',C/2,96);
+    g2.fillStyle='#8de89b';g2.font='bold 46px Barlow Condensed, sans-serif';
+    g2.fillText('1 2 3 4 5 6 7 8 9   R  H  E',C/2,180);
+    g2.fillStyle='#e8e4d9';g2.fillText('HOME    0   0   0',C/2,240);
+    var scr=new THREE.Mesh(new THREE.PlaneGeometry(88,47),
+      new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv2)}));
+    scr.position.set(bx,58,bz-2.7);scr.rotation.y=Math.PI;scene.add(scr);
+    [-52,52].forEach(function(dx){
+      var leg=new THREE.Mesh(new THREE.BoxGeometry(6,60,6),
+        new THREE.MeshLambertMaterial({color:0x39434c}));
+      leg.position.set(bx+dx,30,bz);scene.add(leg);
+    });
+  })();
+
+  /* canopy roofs over the upper deck */
+  (function(){
+    var mat=new THREE.MeshLambertMaterial({color:0xbcc7cf,side:THREE.DoubleSide});
+    for(var a=-150;a<150;a+=30){
+      var r=402,rad=a*Math.PI/180;
+      var px=Math.sin(rad)*r,pz=190+Math.cos(rad)*r;
+      var can=new THREE.Mesh(new THREE.BoxGeometry(190,3.5,92),mat);
+      can.position.set(px,104,pz);
+      can.rotation.y=-rad;can.rotation.x=-0.13;
+      scene.add(can);
+      var sup=new THREE.Mesh(new THREE.BoxGeometry(5,26,5),
+        new THREE.MeshLambertMaterial({color:0x8d9aa4}));
+      sup.position.set(px,92,pz+8);sup.rotation.y=-rad;scene.add(sup);
+    }
+  })();
 
   /* sun glow and a few soft clouds */
   function puff(size,alpha){
@@ -575,10 +618,10 @@ function buildStadium(){
       map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));
     sp.scale.set(size,size*0.52,1);return sp;
   }
-  var sun=puff(360,0.85);sun.position.set(-620,430,1250);sun.scale.set(300,300,1);scene.add(sun);
-  for(var i=0;i<16;i++){
-    var cl=puff(280+Math.random()*320,0.34);
-    cl.position.set(rnd(-1500,1500),rnd(190,400),rnd(500,1700));
+  /* the sky photo supplies the clouds now, so just a soft haze at the rim */
+  for(var i=0;i<5;i++){
+    var cl=puff(560+Math.random()*380,0.13);
+    cl.position.set(rnd(-1400,1400),rnd(150,260),rnd(900,1700));
     scene.add(cl);
   }
 }
@@ -621,15 +664,31 @@ function initScene(){
   renderer=new THREE.WebGLRenderer({canvas:$('cv'),antialias:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.02;
   renderer.outputEncoding=THREE.sRGBEncoding;
 
-  scene=new THREE.Scene();scene.background=skyTex();
-  scene.fog=new THREE.Fog(0x2b455f,430,1900);
+  scene=new THREE.Scene();
+  scene.background=skyTex();               /* fallback until the photo loads */
+  scene.fog=new THREE.Fog(0xb9c6d2,620,2600);
+
+  /* real sky, wrapped three times around a dome. mirrored so there's no seam. */
+  new THREE.TextureLoader().load('sky.jpg',function(t){
+    t.wrapS=THREE.MirroredRepeatWrapping;
+    t.repeat.set(3,1);
+    t.anisotropy=8;
+    var dome=new THREE.Mesh(
+      new THREE.SphereGeometry(2600,48,28,0,Math.PI*2,0,Math.PI*0.56),
+      new THREE.MeshBasicMaterial({map:t,side:THREE.BackSide,fog:false,depthWrite:false}));
+    dome.position.set(0,-120,190);
+    dome.renderOrder=-1;
+    scene.add(dome);
+    scene.background=null;
+  });
   cam=new THREE.PerspectiveCamera(52,1,0.4,4000);
 
-  scene.add(new THREE.HemisphereLight(0xbfd8f0,0x2c4a30,0.85));
-  var sun=new THREE.DirectionalLight(0xfff0d4,1.5);
+  scene.add(new THREE.HemisphereLight(0xd6e2ec,0x3d5a2a,1.15));
+  scene.add(new THREE.AmbientLight(0xc4d2de,0.30));
+  var sun=new THREE.DirectionalLight(0xf2f0ea,0.72);
   sun.position.set(-260,420,180);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);
   var d=290;
@@ -673,7 +732,7 @@ function initScene(){
   tag('3rd',BASE[3][0],BASE[3][1],'#e8e4d9');
 
   /* wall */
-  var wallMat=new THREE.MeshLambertMaterial({color:0x14351f});
+  var wallMat=new THREE.MeshLambertMaterial({color:0x1d4a28});
   var capMat=new THREE.MeshLambertMaterial({color:0xf0d060});
   for(var a=-45;a<45;a+=2.2){
     var p1=xz(fence(a),a),p2=xz(fence(a+2.2),a+2.2);
