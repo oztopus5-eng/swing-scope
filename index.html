@@ -394,6 +394,7 @@ function skyTex(){
   x.fillStyle=g;x.fillRect(0,0,4,256);
   return new THREE.CanvasTexture(c);
 }
+var TL=new THREE.TextureLoader();
 function texMat(url,rx,ry,fallback){
   var m=new THREE.MeshLambertMaterial({color:fallback});
   TL.load(url,function(t){
@@ -1446,7 +1447,9 @@ function sync(){
   $('d3').className=st.bases[2]?'on':'';
 }
 
-initScene();tick();boot();
+try{ initScene();tick(); }
+catch(err){ console.error('scene failed:',err); }
+boot();
 })();
 </script>
 </body>
