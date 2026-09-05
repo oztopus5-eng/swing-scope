@@ -394,30 +394,16 @@ function skyTex(){
   x.fillStyle=g;x.fillRect(0,0,4,256);
   return new THREE.CanvasTexture(c);
 }
-function fieldTex(){
-  var S=1024,c=document.createElement('canvas');c.width=c.height=S;
-  var g=c.getContext('2d');
-  g.fillStyle='#5d9a1d';g.fillRect(0,0,S,S);
-  for(var k=0;k<S;k+=26){
-    g.fillStyle=((k/26)|0)%2?'#69a924':'#528c17';
-    g.fillRect(0,k,S,26);
-  }
-  g.globalAlpha=0.06;
-  for(var d=0;d<5000;d++){
-    g.fillStyle=Math.random()<0.5?'#41750f':'#7cb833';
-    g.fillRect(Math.random()*S,Math.random()*S,2,2);
-  }
-  g.globalAlpha=1;
-  var t=new THREE.CanvasTexture(c);
-  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(14,14);t.anisotropy=8;
-  return t;
+function texMat(url,rx,ry,fallback){
+  var m=new THREE.MeshLambertMaterial({color:fallback});
+  TL.load(url,function(t){
+    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);t.anisotropy=8;
+    m.map=t;m.color.setHex(0xffffff);m.needsUpdate=true;
+  },undefined,function(){ /* keep the fallback colour */ });
+  return m;
 }
-
-/* Everything below is placed in world feet, so it can't land in the wrong
-   half of the field the way a mis-mapped texture can. */
-function flat(shape,color,y){
-  var m=new THREE.Mesh(new THREE.ShapeGeometry(shape,64),
-    new THREE.MeshLambertMaterial({color:color}));
+function flat(shape,mat,y){
+  var m=new THREE.Mesh(new THREE.ShapeGeometry(shape,64),mat);
   m.rotation.x=-Math.PI/2;m.position.y=y;m.receiveShadow=true;
   scene.add(m);return m;
 }
@@ -435,7 +421,7 @@ function buildInfield(){
     var r=(2*60.5*c+Math.sqrt(4*60.5*60.5*c*c+4*(95*95-60.5*60.5)))/2;
     var q=xz(r,a);pt(arc,q[0],q[1]);
   }
-  flat(arc,DIRT,0.03);
+  flat(arc,texMat('dirt.jpg',1/26,1/26,DIRT),0.03);
 
   /* grass sits inside the basepaths */
   var dia=new THREE.Shape();
@@ -443,10 +429,10 @@ function buildInfield(){
   pt(dia,BASE[1][0],BASE[1][1]);
   pt(dia,BASE[2][0],BASE[2][1]);
   pt(dia,BASE[3][0],BASE[3][1]);
-  flat(dia,GRASS,0.05);
+  flat(dia,texMat('grass.jpg',1/34,1/34,GRASS),0.05);
 
   /* base paths cut back through it */
-  var pathMat=new THREE.MeshLambertMaterial({color:DIRT});
+  var pathMat=texMat('dirt.jpg',5,0.35,DIRT);
   for(var b=0;b<4;b++){
     var A=BASE[b],B=BASE[(b+1)%4];
     var len=Math.hypot(B[0]-A[0],B[1]-A[1]);
@@ -458,14 +444,14 @@ function buildInfield(){
   }
 
   /* cutouts around each bag, the plate area, and the mound */
-  function disc(x,z,r,col,y){
-    var m=new THREE.Mesh(new THREE.CircleGeometry(r,40),
-      new THREE.MeshLambertMaterial({color:col}));
+  var discMat=texMat('dirt.jpg',1,1,DIRT), moundMat=texMat('dirt.jpg',0.6,0.6,MOUND);
+  function disc(x,z,r,col,y,mat){
+    var m=new THREE.Mesh(new THREE.CircleGeometry(r,40),mat||discMat);
     m.rotation.x=-Math.PI/2;m.position.set(x,y,z);m.receiveShadow=true;scene.add(m);
   }
   [1,2,3].forEach(function(i){disc(BASE[i][0],BASE[i][1],13,DIRT,0.09);});
   disc(0,0,14,DIRT,0.09);
-  disc(0,60.5,9,MOUND,0.11);
+  disc(0,60.5,9,MOUND,0.11,moundMat);
 }
 
 function buildTrack(){
@@ -478,7 +464,7 @@ function buildTrack(){
     var q2=xz(fence(Math.max(-45,Math.min(45,a)))-16,a);
     pt(sh,q2[0],q2[1]);
   }
-  flat(sh,0xc4562f,0.03);
+  flat(sh,texMat('track.jpg',1/22,1/22,0xc4562f),0.03);
 }
 
 /* two mirrored seam curves with stitches, the way a ball unwraps */
@@ -509,32 +495,13 @@ function ballTex(){
 }
 
 /* stepped seating rows wrapped around the bowl */
-function seatTex(rows,tone){
-  var W=256,H=128,c=document.createElement('canvas');c.width=W;c.height=H;
-  var g=c.getContext('2d');
-  g.fillStyle=tone;g.fillRect(0,0,W,H);
-  var rh=H/rows;
-  for(var r=0;r<rows;r++){
-    g.fillStyle=r%2?'#66737e':'#5c6974';
-    g.fillRect(0,r*rh+rh*0.18,W,rh*0.64);
-    for(var x=0;x<W;x+=7){
-      g.fillStyle=Math.random()<0.55
-        ? ['#e4ded1','#c9765d','#8fa4c2','#6d8a62','#d3b477','#b7c2cc'][(Math.random()*6)|0]
-        : '#4a5661';
-      g.fillRect(x+1,r*rh+rh*0.26,4.6,rh*0.46);
-    }
-    g.fillStyle='#4a5661';g.fillRect(0,r*rh,W,rh*0.16);
-  }
-  var t=new THREE.CanvasTexture(c);
-  t.wrapS=THREE.RepeatWrapping;t.repeat.set(46,1);t.anisotropy=8;
-  return t;
-}
 function buildStadium(){
   var CZ=190;
   function deck(rIn,rOut,h,y,rows,tone){
+    var dm=texMat('seats.jpg',38,rows/4.5,0x6f7d89);
+    dm.side=THREE.DoubleSide;
     var m=new THREE.Mesh(
-      new THREE.CylinderGeometry(rOut,rIn,h,80,1,true),
-      new THREE.MeshLambertMaterial({map:seatTex(rows,tone),side:THREE.DoubleSide}));
+      new THREE.CylinderGeometry(rOut,rIn,h,80,1,true),dm);
     m.position.set(0,y+h/2,CZ);m.receiveShadow=true;scene.add(m);
     return m;
   }
@@ -697,7 +664,7 @@ function initScene(){
   scene.add(sun);
 
   var ground=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),
-    new THREE.MeshLambertMaterial({map:fieldTex()}));
+    texMat('grass.jpg',38,38,0x5d9a1d));
   ground.rotation.x=-Math.PI/2;ground.position.set(0,0,400);
   ground.receiveShadow=true;scene.add(ground);
   buildTrack();
@@ -732,7 +699,7 @@ function initScene(){
   tag('3rd',BASE[3][0],BASE[3][1],'#e8e4d9');
 
   /* wall */
-  var wallMat=new THREE.MeshLambertMaterial({color:0x1d4a28});
+  var wallMat=texMat('wall.jpg',2.4,1,0x1d4a28);
   var capMat=new THREE.MeshLambertMaterial({color:0xf0d060});
   for(var a=-45;a<45;a+=2.2){
     var p1=xz(fence(a),a),p2=xz(fence(a+2.2),a+2.2);
