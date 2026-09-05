@@ -344,8 +344,15 @@ function bestFielder(tr,spray){
 /* one throw: flat when it's short, lofted when it's long */
 function leg(t0,from,to,arm){
   var d=Math.hypot(from[0]-to[0],from[1]-to[1]);
-  var arc=Math.min(d*d/1500,26);
-  return {t0:t0,dur:Math.max(0.28,d/(arm||102)+arc/95),from:from,to:to,arc:arc,d:d};
+  var arc=Math.min(d*d/1700,22);
+  return {t0:t0,dur:Math.max(0.24,d/(arm||128)+arc/120),from:from,to:to,arc:arc,d:d};
+}
+/* who runs over to take the throw at each bag */
+function coverFor(base,fielding){
+  if(base===1) return fielding===1?2:1;          /* 2B covers if the 1B fielded it */
+  if(base===2) return fielding===2?3:2;          /* SS if the 2B fielded it */
+  if(base===3) return fielding===4?3:4;
+  return -1;
 }
 /* who cuts it off — shortstop on the left side, second baseman on the right */
 function cutoffMan(spray){ return spray<0?3:2; }
@@ -366,7 +373,7 @@ function intercept(tr,spray,fi){
 /* ============================ RUNNERS ============================ */
 var BASE=[[0,0],[-63.6,63.6],[0,127.3],[63.6,63.6],[0,0]];
 function runTime(ft,fromStop){
-  var vmax=26,acc=14;
+  var vmax=29,acc=16;
   if(!fromStop)return ft/vmax;
   var tA=vmax/acc,dA=0.5*acc*tA*tA;
   return ft<=dA?Math.sqrt(2*ft/acc):tA+(ft-dA)/vmax;
@@ -395,6 +402,19 @@ function skyTex(){
   return new THREE.CanvasTexture(c);
 }
 var TL=new THREE.TextureLoader();
+/* plain mown grass, drawn in code — no photograph */
+function mowTex(){
+  var S=512,c=document.createElement('canvas');c.width=c.height=S;
+  var g=c.getContext('2d');
+  g.fillStyle='#5d9a1d';g.fillRect(0,0,S,S);
+  for(var k=0;k<S;k+=64){
+    g.fillStyle=((k/64)|0)%2?'#63a321':'#589219';
+    g.fillRect(0,k,S,64);
+  }
+  var t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(9,9);t.anisotropy=8;
+  return t;
+}
 function texMat(url,rx,ry,fallback){
   var m=new THREE.MeshLambertMaterial({color:fallback});
   TL.load(url,function(t){
@@ -422,7 +442,7 @@ function buildInfield(){
     var r=(2*60.5*c+Math.sqrt(4*60.5*60.5*c*c+4*(95*95-60.5*60.5)))/2;
     var q=xz(r,a);pt(arc,q[0],q[1]);
   }
-  flat(arc,texMat('dirt.jpg',1/26,1/26,DIRT),0.03);
+  flat(arc,new THREE.MeshLambertMaterial({color:DIRT}),0.03);
 
   /* grass sits inside the basepaths */
   var dia=new THREE.Shape();
@@ -430,10 +450,10 @@ function buildInfield(){
   pt(dia,BASE[1][0],BASE[1][1]);
   pt(dia,BASE[2][0],BASE[2][1]);
   pt(dia,BASE[3][0],BASE[3][1]);
-  flat(dia,texMat('grass.jpg',1/34,1/34,GRASS),0.05);
+  flat(dia,new THREE.MeshLambertMaterial({color:GRASS}),0.05);
 
   /* base paths cut back through it */
-  var pathMat=texMat('dirt.jpg',5,0.35,DIRT);
+  var pathMat=new THREE.MeshLambertMaterial({color:DIRT});
   for(var b=0;b<4;b++){
     var A=BASE[b],B=BASE[(b+1)%4];
     var len=Math.hypot(B[0]-A[0],B[1]-A[1]);
@@ -445,7 +465,8 @@ function buildInfield(){
   }
 
   /* cutouts around each bag, the plate area, and the mound */
-  var discMat=texMat('dirt.jpg',1,1,DIRT), moundMat=texMat('dirt.jpg',0.6,0.6,MOUND);
+  var discMat=new THREE.MeshLambertMaterial({color:DIRT}),
+      moundMat=new THREE.MeshLambertMaterial({color:MOUND});
   function disc(x,z,r,col,y,mat){
     var m=new THREE.Mesh(new THREE.CircleGeometry(r,40),mat||discMat);
     m.rotation.x=-Math.PI/2;m.position.set(x,y,z);m.receiveShadow=true;scene.add(m);
@@ -465,7 +486,7 @@ function buildTrack(){
     var q2=xz(fence(Math.max(-45,Math.min(45,a)))-16,a);
     pt(sh,q2[0],q2[1]);
   }
-  flat(sh,texMat('track.jpg',1/22,1/22,0xc4562f),0.03);
+  flat(sh,new THREE.MeshLambertMaterial({color:0xc4562f}),0.03);
 }
 
 /* two mirrored seam curves with stitches, the way a ball unwraps */
@@ -499,15 +520,14 @@ function ballTex(){
 function buildStadium(){
   var CZ=190;
   function deck(rIn,rOut,h,y,rows,tone){
-    var dm=texMat('seats.jpg',38,rows/4.5,0x6f7d89);
-    dm.side=THREE.DoubleSide;
+    var dm=new THREE.MeshLambertMaterial({color:tone,side:THREE.DoubleSide});
     var m=new THREE.Mesh(
       new THREE.CylinderGeometry(rOut,rIn,h,80,1,true),dm);
     m.position.set(0,y+h/2,CZ);m.receiveShadow=true;scene.add(m);
     return m;
   }
-  deck(252,318,34,4,11,'#7d8a95');
-  deck(330,404,44,44,14,'#6f7d89');
+  deck(252,318,34,4,11,0x7d8a95);
+  deck(330,404,44,44,14,0x6f7d89);
 
   /* the concrete lip between decks, and the roof band above */
   [[318,330,40,38],[404,428,16,88]].forEach(function(v){
@@ -665,7 +685,7 @@ function initScene(){
   scene.add(sun);
 
   var ground=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),
-    texMat('grass.jpg',38,38,0x5d9a1d));
+    new THREE.MeshLambertMaterial({map:mowTex()}));
   ground.rotation.x=-Math.PI/2;ground.position.set(0,0,400);
   ground.receiveShadow=true;scene.add(ground);
   buildTrack();
@@ -913,6 +933,32 @@ function tick(){
     var fdt=Math.min(0.05,(now-(flight.lastF||now))/1000);flight.lastF=now;
     flight.simT=(flight.simT||0)+fdt*(flight.simT<flight.tr.hang?AIRSPD:ROLLSPD);
     var e2=flight.simT;
+
+    /* somebody has to be standing on the bag to take the throw */
+    if(flight.cover&&flight.cover.i>=0){
+      var ci=flight.cover.i,cm0=fielderMesh[ci],chome=fielderHome[ci];
+      var ct=flight.cover.to;
+      var cdx=ct[0]-chome[0],cdz=ct[1]-chome[1],cD=Math.hypot(cdx,cdz);
+      if(cD>1){
+        var cgo=Math.min(cD,coverage(e2-0.25,FIELD[ci].sp));
+        cm0.g.position.set(chome[0]+cdx/cD*cgo,0,chome[1]+cdz/cD*cgo);
+        cm0.g.rotation.y=Math.atan2(cdx,cdz);
+        cm0.legs.position.y=1.3+(cgo<cD?Math.abs(Math.sin(e2*12))*0.3:0);
+      }
+    }
+    /* and the neighbours break toward the ball rather than standing still */
+    if(flight.converge&&flight.ballAt){
+      flight.converge.forEach(function(o){
+        var m0=fielderMesh[o.i],h0=fielderHome[o.i];
+        var dx0=flight.ballAt[0]-h0[0],dz0=flight.ballAt[1]-h0[1];
+        var D0=Math.hypot(dx0,dz0);
+        if(D0>1){
+          var go0=Math.min(D0*0.62,coverage(e2-0.5,FIELD[o.i].sp*0.8));
+          m0.g.position.set(h0[0]+dx0/D0*go0,0,h0[1]+dz0/D0*go0);
+          m0.g.rotation.y=Math.atan2(dx0,dz0);
+        }
+      });
+    }
 
     /* a caught ball is caught: freeze it in the glove and put his arm up */
     if(flight.caught&&e2>=flight.tr.hang){
@@ -1238,7 +1284,7 @@ function play(velo,launch,spray,rpm,foul){
     at2=ip.t+0.65+tb(2)/112+rnd(0,0.30);
     at3=ip.t+0.65+tb(3)/112+rnd(0,0.30);
     infield=(launch<10&&ip.d<210);
-    finalBase=infield?1:(at2<7.85?1:(at3<11.31?2:3));
+    finalBase=infield?1:(at2<7.11?1:(at3<10.3?2:3));
   }
 
   var goingTo=gone?4:(caught===true?1:finalBase);
@@ -1254,11 +1300,18 @@ function play(velo,launch,spray,rpm,foul){
   }
   startRuns(opening);
 
-  /* throw to the bag he's running for, through a cutoff if it's a long one */
+  /* throw where there is actually a play: ahead of the lead forced runner,
+     otherwise at the bag the batter is running for */
   var legs=[];
   if(ip){
     var thb=infield?1:finalBase;
+    if(st.bases[2]&&st.bases[1]&&st.bases[0]) thb=4;        /* bases loaded, go home */
+    else if(st.bases[1]&&st.bases[0])         thb=Math.max(thb,3);
+    else if(st.bases[0]&&infield)             thb=2;        /* force at second */
+    else if(st.bases[2]&&!infield&&tr.air<300)thb=4;        /* cut down the run */
+    if(thb===4) thb=0;                                      /* home plate */
     var bagXZ=[BASE[thb][0],BASE[thb][1]];
+    var coverIdx=coverFor(thb,near.i);
     var raw=Math.hypot(fx-bagXZ[0],fz-bagXZ[1]);
     var t0=ip.t+(infield?0.42:0.62);
     if(raw>180){
@@ -1266,13 +1319,13 @@ function play(velo,launch,spray,rpm,foul){
       /* relay man sets up on the line, about 115 ft short of the bag */
       var ux=(fx-bagXZ[0])/raw,uz=(fz-bagXZ[1])/raw;
       var relay=[bagXZ[0]+ux*115,bagXZ[1]+uz*115];
-      var L1=leg(t0,[fx,fz],relay,112);
-      var L2=leg(L1.t0+L1.dur+0.45,relay,bagXZ,104);
-      L2.base=thb;L1.cut=cm;L1.relayAt=relay;
+      var L1=leg(t0,[fx,fz],relay,140);
+      var L2=leg(L1.t0+L1.dur+0.38,relay,bagXZ,132);
+      L2.base=thb;L2.cover=coverIdx;L1.cut=cm;L1.relayAt=relay;
       legs=[L1,L2];
     } else {
-      var L=leg(t0,[fx,fz],bagXZ,infield?102:110);
-      L.base=thb;legs=[L];
+      var L=leg(t0,[fx,fz],bagXZ,infield?128:136);
+      L.base=thb;L.cover=coverIdx;legs=[L];
     }
   }
   flightThrow=legs.length?legs[0]:null;
@@ -1292,11 +1345,24 @@ function play(velo,launch,spray,rpm,foul){
       last=[Lz.to[0],Lz.to[1]];
       rStart=Lz.t0+Lz.dur+0.65;
     }
-    legs.push(leg(rStart,last,[0,60.5],104));
+    legs.push(leg(rStart,last,[0,60.5],126));
     legs[legs.length-1].mound=true;
     flight.until=rStart+legs[legs.length-1].dur+0.60;
   }
   flight.legs=legs;flight.li=0;
+  if(ip){
+    flight.cover={i:coverIdx,to:[BASE[thb][0],BASE[thb][1]]};
+    /* the two next-nearest break toward the ball as well */
+    var others=[];
+    for(var oi=0;oi<FIELD.length;oi++){
+      if(oi===near.i||oi===coverIdx)continue;
+      var q=xz(FIELD[oi].d,FIELD[oi].a);
+      others.push({i:oi,d:Math.hypot(q[0]-fx,q[1]-fz)});
+    }
+    others.sort(function(a,b){return a.d-b.d;});
+    flight.converge=[others[0],others[1]].filter(Boolean);
+    flight.ballAt=[fx,fz];
+  }
   view='fly';
 
   var reveal=realMs(gone?tr.hang+1.1:(caught===true?tr.hang+0.35:
